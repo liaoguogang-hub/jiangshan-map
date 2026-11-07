@@ -10,25 +10,28 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
+import com.jiangshan.atlas.agent.AgentPanel
+import com.jiangshan.atlas.agent.AtlasBridge
 import java.io.ByteArrayInputStream
 
 /**
- * 江山时序 · 中国历史交互舆图的 Android 封装。
+ * 江山时序 · 中国历史交互舆图。
  *
  * 站点是零构建的纯静态资源，全部打包在 assets/www 下，
- * 通过 WebViewAssetLoader 以 https://appassets.androidplatform.net/ 这个
- * 正规来源提供给 WebView，从而：
- *   - 不需要 file:// 的放宽配置，fetch / localStorage 行为与线上一致
- *   - 不声明 INTERNET 权限也能正常工作
+ * 通过 WebViewAssetLoader 以 https://appassets.androidplatform.net/ 提供。
+ *
+ * 站点在 DOMContentLoaded 时挂了 `window.atlasAPI`（inspect / search / openPerson …），
+ * 所以内置 Agent 可以直接调用这套考据能力，不需要把地名匹配逻辑在 Kotlin 里重写。
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var content: FrameLayout
+    private lateinit var agentPanel: AgentPanel
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,10 +43,6 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         webView = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
             setBackgroundColor(PAPER_COLOR)
             isVerticalScrollBarEnabled = false
             overScrollMode = WebView.OVER_SCROLL_NEVER
@@ -58,7 +57,6 @@ class MainActivity : AppCompatActivity() {
                 displayZoomControls = false
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mediaPlaybackRequiresUserGesture = true
-                // 站点的字体走 Google Fonts，离线拿不到，用系统字体兜底即可
                 textZoom = 100
             }
 
@@ -68,7 +66,6 @@ class MainActivity : AppCompatActivity() {
                     request: WebResourceRequest
                 ): WebResourceResponse? {
                     val url = request.url
-                    // 站内资源由 AssetLoader 提供
                     if (url.host == ASSET_DOMAIN) {
                         return assetLoader.shouldInterceptRequest(url)
                     }
@@ -82,16 +79,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        setContentView(webView)
-        addResearchEntry()
+        content = FrameLayout(this).apply {
+            addView(
+                webView,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        setContentView(content)
+
+        agentPanel = AgentPanel(
+            this,
+            content,
+            AtlasBridge(webView),
+            onOpenMap = { query -> webView.loadUrl("$BASE_URL/index.html?$query") },
+        )
+
+        addAgentEntry()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                when {
+                    agentPanel.isShowing() -> agentPanel.hide()
+                    webView.canGoBack() -> webView.goBack()
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
             }
         })
@@ -100,7 +114,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 右下浮动按钮：打开考据助手 */
-    private fun addResearchEntry() {
+    private fun addAgentEntry() {
         val btn = androidx.appcompat.widget.AppCompatButton(this).apply {
             text = "考据"
             setTextColor(0xFFFFFFFF.toInt())
@@ -108,37 +122,23 @@ class MainActivity : AppCompatActivity() {
             textSize = 14f
             elevation = 12f
             stateListAnimator = null
-            setOnClickListener {
-                researchLauncher.launch(Intent(this@MainActivity, ResearchActivity::class.java))
-            }
+            setOnClickListener { agentPanel.show() }
         }
-        val bg = GradientDrawable().apply {
+        btn.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 40f
             setColor(0xE62B2622.toInt())
             setStroke(1, 0x66FFFFFF)
         }
-        btn.background = bg
 
-        val lp = android.widget.FrameLayout.LayoutParams(
+        val lp = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
             setMargins(24, 0, 24, 240)
         }
-        (webView.parent as? ViewGroup)?.addView(btn, lp)
-    }
-
-    /** 考据助手返回的地图深链 */
-    private val researchLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.getStringExtra(ResearchActivity.EXTRA_QUERY)?.let { query ->
-                webView.loadUrl("$BASE_URL/index.html?$query")
-            }
-        }
+        content.addView(btn, lp)
     }
 
     /** 支持 jiangshan://atlas?year=741&place=长安 这类深链 */
@@ -150,6 +150,12 @@ class MainActivity : AppCompatActivity() {
             ""
         }
         return "$BASE_URL/index.html$query"
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        webView.loadUrl(resolveStartUrl())
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

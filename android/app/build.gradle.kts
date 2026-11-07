@@ -10,8 +10,10 @@ android {
         applicationId = "com.jiangshan.atlas"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        // 版本号规则：versionCode 每次发版 +1；versionName 用语义化版本
+        // 1.0.0 离线封装 / 1.1.0 电脑端 MCP 客户端 / 1.2.0 手机内 Agent
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
