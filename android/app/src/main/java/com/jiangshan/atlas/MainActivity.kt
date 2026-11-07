@@ -2,6 +2,7 @@ package com.jiangshan.atlas
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
@@ -10,7 +11,9 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
 import java.io.ByteArrayInputStream
 
@@ -80,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(webView)
+        addResearchEntry()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -95,6 +99,48 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(resolveStartUrl())
     }
 
+    /** 右下浮动按钮：打开考据助手 */
+    private fun addResearchEntry() {
+        val btn = androidx.appcompat.widget.AppCompatButton(this).apply {
+            text = "考据"
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(20, 10, 20, 10)
+            textSize = 14f
+            elevation = 12f
+            stateListAnimator = null
+            setOnClickListener {
+                researchLauncher.launch(Intent(this@MainActivity, ResearchActivity::class.java))
+            }
+        }
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 40f
+            setColor(0xE62B2622.toInt())
+            setStroke(1, 0x66FFFFFF)
+        }
+        btn.background = bg
+
+        val lp = android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+            setMargins(24, 0, 24, 240)
+        }
+        (webView.parent as? ViewGroup)?.addView(btn, lp)
+    }
+
+    /** 考据助手返回的地图深链 */
+    private val researchLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.getStringExtra(ResearchActivity.EXTRA_QUERY)?.let { query ->
+                webView.loadUrl("$BASE_URL/index.html?$query")
+            }
+        }
+    }
+
     /** 支持 jiangshan://atlas?year=741&place=长安 这类深链 */
     private fun resolveStartUrl(): String {
         val data = intent?.data
@@ -104,16 +150,6 @@ class MainActivity : AppCompatActivity() {
             ""
         }
         return "$BASE_URL/index.html$query"
-    }
-
-    /**
-     * launchMode = singleTask 时，App 已在前台收到深链不会再走 onCreate，
-     * 必须在这里重新载入，否则深链会被忽略。
-     */
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        webView.loadUrl(resolveStartUrl())
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

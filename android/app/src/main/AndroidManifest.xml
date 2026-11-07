@@ -2,11 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      不声明 android.permission.INTERNET。
-      站内所有资源都打包在 assets/www 里，通过 WebViewAssetLoader 以
-      https://appassets.androidplatform.net/ 提供，完全离线可用；
-      站点的统计脚本 / CDN 字体因无网络权限会立即失败，不会卡住加载。
+      INTERNET 权限仅用于「考据助手」连接你自己 PC 上的 MCP 服务（比如
+      adb reverse 出来的 127.0.0.1:8798）。网页内容本身仍然完全离线：
+      WebViewClient 会把所有非 appassets.androidplatform.net 的请求直接拦截。
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -39,5 +39,13 @@
                     android:scheme="jiangshan" />
             </intent-filter>
         </activity>
+
+        <!-- 考据助手：MCP 客户端，点「在地图中打开」把结果交回 MainActivity 加载 -->
+        <activity
+            android:name=".ResearchActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density|fontScale"
+            android:exported="false"
+            android:theme="@style/Theme.Jiangshan.Dialog"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
