@@ -1,16 +1,44 @@
-# 江山时序 · Android 封装
+# 江山时序 · Android
 
-把 [江山时序](https://deanchen.me/jiangshan-map/) 这幅中国历史交互舆图打成可安装的 Android App，
-网页内容**完全离线**运行，并额外内置一个 **MCP 考据助手**：用自然语言提问，AI 把问题考据成
-「年份 + 地点/人物」，再把结果画到地图上。
+把 [江山时序](https://deanchen.me/jiangshan-map/) 这幅中国历史交互舆图封装成 Android App，
+网页内容**完全离线**，并内置一个**考据 Agent**：用自然语言提问，模型把问题拆解成年份与地点，
+舆图再给出真实的年号、政区、坐标与两千年沿革。
 
-- 上游站点是零构建的纯静态资源（`index.html` + `css/` + `js/` + `data/` + `geojson/`），
-  所以不需要 npm build，直接把仓库根目录的资源复制进 `assets/www` 即可。
-- 网页通过 `androidx.webkit` 的 `WebViewAssetLoader` 以
-  `https://appassets.androidplatform.net/` 提供，拿到正规 https 来源，
-  `fetch` / `localStorage` 行为与线上一致，不需要放宽 `file://` 限制。
-- `WebViewClient` 会把所有非 `appassets.androidplatform.net` 的请求直接拦截，
-  站内统计脚本与 CDN 字体不会卡在超时上。
+> 上游站点：[DeanChensj/jiangshan-map](https://github.com/DeanChensj/jiangshan-map)（GPL-3.0）
+> 本目录是 Android 封装层的全部源码。
+
+## 版本
+
+| 版本 | 内容 |
+|---|---|
+| [1.2.0](CHANGELOG.md) | 手机内置 Agent，不依赖电脑；支持 DeepSeek / MiniMax / Kimi / 通义 / OpenAI |
+| 1.1.0 | 电脑端 MCP 考据助手（已从 App 移除，脚本保留） |
+| 1.0.0 | 离线封装 + 深链 |
+
+安装包：见 [Releases](https://github.com/liaoguogang-hub/jiangshan-map/releases)。
+
+## 架构
+
+```
+MainActivity
+├── WebView（assets/www，完全离线）
+│     └── window.atlasAPI ← 站点自带：inspect / search / openPerson / resolvePlace
+└── AgentPanel（浮层，右下角「考据」）
+      │
+      ├── LlmConfig     厂商预设 + 分厂商持久化
+      ├── LlmClient     OpenAI 兼容 chat completions（零第三方依赖）
+      ├── AtlasBridge   evaluateJavascript 调 window.atlasAPI
+      └── AgentEngine   编排：模型解析 → 工具分派 → 结构化结果
+```
+
+**分工是关键**：模型只负责「听懂问题」，输出
+
+```json
+{"answer": "...", "tool": "inspect_place", "year": 744, "place": "洛阳,梁宋,东鲁"}
+```
+
+年号、政权、政区、坐标、沿革文字**全部由舆图提供** —— 模型碰不到这些字段，想编也编不出来。
+这也是为什么答案里既有模型的叙述，又有精确到小数点后两位的坐标。
 
 ## 构建
 
@@ -26,11 +54,29 @@ cd android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-产物：`android/app/build/outputs/apk/debug/app-debug.apk`（约 37 MB）。
+产物约 37 MB。
+
+## 使用考据 Agent
+
+1. 点右下角「考据」
+2. 选厂商（地址与模型名自动带出），填 API Key，点「保存」
+3. 输入问题，或点示例按钮
+
+支持的厂商：
+
+| 厂商 | 接口 | 默认模型 |
+|---|---|---|
+| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
+| MiniMax | `https://api.minimaxi.com` | `MiniMax-M3.1-Flash` |
+| Kimi (Moonshot) | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| 自定义 | 任意 OpenAI 兼容网关 | — |
+
+配置按厂商独立保存，切换不丢已填的 Key。模型报错（额度用尽 / Key 无效 / 模型名不对）
+会把厂商原文显示在界面上。
 
 ## 深链
-
-App 注册了 `jiangshan://atlas` scheme，可直接跳到任意年份与地点：
 
 ```bash
 adb shell am start -a android.intent.action.VIEW \
@@ -38,106 +84,21 @@ adb shell am start -a android.intent.action.VIEW \
 ```
 
 对应站点自身的 `?year=&place=&person=` 协议。`launchMode` 为 `singleTask`，
-`onNewIntent` 里会重新载入页面，因此 App 已在前台时深链同样生效。
+`onNewIntent` 里会重新载入，所以 App 已在前台时深链同样生效。
 
----
+## 电脑端 MCP（可选）
 
-## MCP 考据助手
-
-### 它做什么
-
-主界面右下角有一个「考据」按钮，点开是一个对话框，可以输入自然语言问题，例如：
-
-- 雪拥蓝关马不前是哪一年，韩愈当时被贬在哪里
-- 李白和杜甫在哪里相遇
-- 赤壁在今天的哪里
-
-App 把问题发给 PC 上的 MCP 服务，服务端用 LLM 考据出年份与地点，
-再调用舆图自带的 `inspect_place` / `inspect_person` / `search_atlas` 取结构化数据，
-返回：
-
-```
-answer   ← AI 的考据解答
-year     ← 819
-place    ← 蓝关,潮州
-atlas.era            ← 唐宪宗·元和十四年
-atlas.polity         ← 唐
-atlas.regions        ← [关内道]
-atlas.modernProvince ← 陕西省
-atlas.coord          ← [109.48, 34.03]
-atlas.lore           ← 两千年沿革文字
-atlas.url            ← 深链
-```
-
-点「在地图中打开」后，App 取出 `url` 的 query 部分，在 WebView 里加载，
-地图会跳到对应年份并画出人物/路线行迹。
-
-### 架构
-
-```
-手机 App（MCP 客户端）                  PC（MCP 服务端）
-─────────────────────                  ────────────────────────────────
-WebSocketClient  ── ws://host:port/mcp ──►  scripts/mcp_ws_server.js
-  · 手写 RFC 6455 帧                        · 复用 scripts/mcp_server.js 的
-  · 独立 IO 线程，不阻塞主线程                沙箱与控制器
-  · 客户端帧带掩码                          · MCP JSON-RPC 2.0
-                                          · ask_question 工具调 LLM 做考据
-McpClient                                · 需要桌面版 MCP 时仍可用
-  · initialize / tools/list / tools/call    scripts/mcp_server.js（stdio）
-```
-
-### 启动服务端
+App 已经不需要电脑了，但 `scripts/mcp_server.js`（stdio）与 `scripts/mcp_ws_server.js`
+（WebSocket）仍然保留，可以给 Claude Desktop / Cursor 等桌面 MCP 客户端用：
 
 ```bash
-# 只测舆图工具（不需要 LLM）
-node scripts/mcp_ws_server.js --port 8798 --host 0.0.0.0
+# 桌面客户端（Claude Desktop / Cursor）指向这个 stdio 服务
+node scripts/mcp_server.js
 
-# 带自然语言考据（任何 OpenAI 兼容或 Anthropic 兼容端点）
-LLM_BASE_URL=https://api.deepseek.com \
-LLM_API_KEY=sk-xxx \
-LLM_MODEL=deepseek-chat \
-node scripts/mcp_ws_server.js --port 8798 --host 0.0.0.0
+# 或者起 WebSocket 版，多一个 ask_question 工具
+LLM_BASE_URL=https://api.deepseek.com LLM_API_KEY=sk-xxx LLM_MODEL=deepseek-chat \
+  node scripts/mcp_ws_server.js --port 8798 --host 0.0.0.0
 ```
-
-健康检查：`curl http://127.0.0.1:8798/health`
-
-环境变量说明：
-
-| 变量 | 用途 |
-|---|---|
-| `LLM_BASE_URL` | 端点根地址，如 `https://api.deepseek.com` |
-| `LLM_API_KEY` | API key（也接受 `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY`） |
-| `LLM_MODEL` | 模型名，留空用端点默认 |
-| `LLM_TRANSPORT` | 强制 `openai` 或 `anthropic`，默认按 URL 自动判断 |
-
-> Anthropic 兼容端点（如 `https://api.minimaxi.com/anthropic`）走 `/v1/messages`；
-> 其余走 `/v1/chat/completions`。
-
-### 手机连接
-
-有两种方式：
-
-**A. USB 隧道（推荐，不暴露端口）**
-
-```bash
-adb reverse tcp:8798 tcp:8798
-# 然后在 App 里填 127.0.0.1 / 8798
-```
-
-**B. 局域网**
-
-```bash
-node scripts/mcp_ws_server.js --port 8798 --host 0.0.0.0
-# 在 App 里填 PC 的局域网 IP，例如 192.168.1.10 / 8798
-```
-
-### 权限说明
-
-`AndroidManifest.xml` 里声明了 `android.permission.INTERNET`，**仅用于连接你自己 PC 上的
-MCP 服务**（Android 连回环地址也需要这个权限，否则报 `EPERM`）。
-网页内容本身仍然完全离线：`WebViewClient` 会拦截一切非 `appassets` 的请求。
-
----
 
 ## 工具链
 
@@ -149,17 +110,23 @@ MCP 服务**（Android 连回环地址也需要这个权限，否则报 `EPERM`�
 | compileSdk / targetSdk | 37 |
 | minSdk | 24 |
 
-> `gradle/wrapper/gradle-wrapper.properties` 里的 `distributionUrl` 指向腾讯云镜像，
-> `settings.gradle.kts` 里的仓库也按「阿里云优先」排序——国内直连
-> `services.gradle.org` 和 `repo.maven.apache.org` 会超时或挂死。
+> `gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 指向腾讯云镜像，
+> `settings.gradle.kts` 的仓库按「阿里云优先」排序——国内直连 `services.gradle.org`
+> 和 `repo.maven.apache.org` 会超时或挂死。
 >
-> AGP 9 有两处 API 变更：不再需要 `org.jetbrains.kotlin.android` 插件；
+> AGP 9 两处 API 变更：不再需要 `org.jetbrains.kotlin.android` 插件；
 > `kotlinOptions { jvmTarget }` 改用 `kotlin { compilerOptions { } }`。
+
+## 权限
+
+`INTERNET` 只用于调用你配置的模型服务。网页内容仍完全离线：
+`WebViewClient` 会拦截所有非 `appassets.androidplatform.net` 的请求，
+站点自带的统计脚本与 CDN 字体不会卡在超时上。
 
 ## 注意
 
-- `android/app/src/main/assets/www/` 是**生成目录**，已加入 `android/.gitignore`，
+- `app/src/main/assets/www/` 是**生成目录**，已加入 `android/.gitignore`，
   由 `prepare_assets.sh` 从仓库根目录复制而来，不要手工提交。
 - 站点里 `assets/hero_demo_*.webp` 与 `assets/preview_*.webp` 只用于 README 演示
   （约 17 MB），打包时已跳过。
-- APK 用的是 debug 签名，要分发得换成自己的 keystore。
+- APK 使用 debug 签名，自行分发请换成自己的 keystore。
