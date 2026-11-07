@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 宣纸设色主题，与站点 CSS 变量保持一致 -->
+    <color name="paper">#F3EEE4</color>
+    <color name="ink">#2B2622</color>
+</resources>

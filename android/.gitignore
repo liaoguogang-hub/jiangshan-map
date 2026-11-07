@@ -1,0 +1,7 @@
+# 构建产物
+build/
+.gradle/
+local.properties
+
+# 由 android/prepare_assets.sh 从仓库根目录生成的站点资源副本（不入库）
+app/src/main/assets/www/
