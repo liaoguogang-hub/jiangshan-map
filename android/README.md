@@ -117,6 +117,16 @@ LLM_BASE_URL=https://api.deepseek.com LLM_API_KEY=sk-xxx LLM_MODEL=deepseek-chat
 > AGP 9 两处 API 变更：不再需要 `org.jetbrains.kotlin.android` 插件；
 > `kotlinOptions { jvmTarget }` 改用 `kotlin { compilerOptions { } }`。
 
+### 推送
+
+本机直连 `github.com` 会被重置，`gh-proxy` 能拉取但不转发凭据，`git push` 走不通。
+`scripts/push_via_api.py` 改走 GitHub Git Data API（`gh api` 是通的）：
+
+```bash
+python scripts/push_via_api.py --dry-run   # 先看会推哪些文件
+python scripts/push_via_api.py             # 建 blob → 建 tree → 建 commit → 更新 ref
+```
+
 ## 权限
 
 `INTERNET` 只用于调用你配置的模型服务。网页内容仍完全离线：
