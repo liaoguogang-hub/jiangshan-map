@@ -11,9 +11,10 @@ android {
         minSdk = 24
         targetSdk = 37
         // 版本号规则：versionCode 每次发版 +1；versionName 用语义化版本
-        // 1.0.0 离线封装 / 1.1.0 电脑端 MCP / 1.2.0 手机内 Agent / 1.3.0 工具栏入口
-        versionCode = 4
-        versionName = "1.3.0"
+        // 1.0.0 离线封装 / 1.1.0 电脑端 MCP / 1.2.0 手机内 Agent
+        // 1.3.0 工具栏入口 / 1.3.1 全面屏内边距适配
+        versionCode = 5
+        versionName = "1.3.1"
     }
 
     buildTypes {

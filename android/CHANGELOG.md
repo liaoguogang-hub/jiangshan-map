@@ -3,6 +3,22 @@
 本工程把开源站点 [江山时序](https://deanchen.me/jiangshan-map/) 封装成 Android App。
 版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)；`versionCode` 每次发版 +1。
 
+## [1.3.1] — 2026-11-08
+
+**修复：Android 15+ 顶部状态栏重叠、按钮点不动**
+
+Android 15（API 35）起，`targetSdk >= 35` 的应用被强制全面屏，内容绘制到状态栏和
+导航栏下面。表现是站点顶部工具栏被状态栏盖住，且点击被系统手势区截走。
+
+- `MainActivity` 增加 `applySystemBarInsets()`：
+  - `setDecorFitsSystemWindows(window, false)` 显式声明全面屏
+  - 用 `ViewCompat.setOnApplyWindowInsetsListener` 把 `systemBars + displayCutout + ime`
+    的尺寸作为根布局内边距让出来
+  - 同步设置浅色状态栏/导航栏图标
+- 刘海/挖孔屏（`displayCutout`）一并处理
+- 输入法弹出时（`ime`）面板不再被键盘遮住
+- 老版本系统上同样生效，行为不变
+
 ## [1.3.0] — 2026-11-08
 
 **入口移到顶部工具栏**

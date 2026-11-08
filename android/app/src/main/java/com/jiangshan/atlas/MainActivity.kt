@@ -13,6 +13,10 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import com.jiangshan.atlas.agent.AgentPanel
 import com.jiangshan.atlas.agent.AtlasBridge
@@ -95,6 +99,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         setContentView(content)
+        applySystemBarInsets()
 
         agentPanel = AgentPanel(
             this,
@@ -186,6 +191,32 @@ class MainActivity : AppCompatActivity() {
         fun openAgent() {
             runOnUiThread { agentPanel.showAsk() }
         }
+    }
+
+    /**
+     * Android 15（API 35）起，targetSdk >= 35 的应用被强制全面屏：
+     * 内容会绘制到状态栏和导航栏下面，导致站点顶部工具栏被状态栏盖住、
+     * 按钮点击被系统手势区截走。
+     *
+     * 这里把系统栏（含刘海/挖孔）以及输入法的尺寸作为内边距让出来，
+     * 老版本系统上同样生效。
+     */
+    private fun applySystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, content).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.ime()
+            )
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(content)
     }
 
     /** 支持 jiangshan://atlas?year=741&place=长安 这类深链 */
