@@ -2,9 +2,9 @@ package com.jiangshan.atlas
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -21,11 +21,13 @@ import java.io.ByteArrayInputStream
 /**
  * 江山时序 · 中国历史交互舆图。
  *
- * 站点是零构建的纯静态资源，全部打包在 assets/www 下，
- * 通过 WebViewAssetLoader 以 https://appassets.androidplatform.net/ 提供。
+ * 站点资源零构建打包在 assets/www，通过 WebViewAssetLoader 以
+ * https://appassets.androidplatform.net/ 提供，完全离线。
  *
- * 站点在 DOMContentLoaded 时挂了 `window.atlasAPI`（inspect / search / openPerson …），
- * 所以内置 Agent 可以直接调用这套考据能力，不需要把地名匹配逻辑在 Kotlin 里重写。
+ * 顶部工具栏（.control-strip）里由本类注入两个按钮：
+ *   「设置」→ 模型服务配置
+ *   「考据」→ 提问与结果
+ * 点击通过 JavascriptInterface 回到原生。
  */
 class MainActivity : AppCompatActivity() {
 
@@ -60,6 +62,8 @@ class MainActivity : AppCompatActivity() {
                 textZoom = 100
             }
 
+            addJavascriptInterface(WebAppBridge(), JS_BRIDGE_NAME)
+
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView,
@@ -75,6 +79,10 @@ class MainActivity : AppCompatActivity() {
                         "utf-8",
                         ByteArrayInputStream(ByteArray(0))
                     )
+                }
+
+                override fun onPageFinished(view: WebView, url: String) {
+                    injectToolbarButtons(view)
                 }
             }
         }
@@ -95,8 +103,6 @@ class MainActivity : AppCompatActivity() {
             onOpenMap = { query -> webView.loadUrl("$BASE_URL/index.html?$query") },
         )
 
-        addAgentEntry()
-
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
@@ -113,32 +119,73 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(resolveStartUrl())
     }
 
-    /** 右下浮动按钮：打开考据助手 */
-    private fun addAgentEntry() {
-        val btn = androidx.appcompat.widget.AppCompatButton(this).apply {
-            text = "考据"
-            setTextColor(0xFFFFFFFF.toInt())
-            setPadding(20, 10, 20, 10)
-            textSize = 14f
-            elevation = 12f
-            stateListAnimator = null
-            setOnClickListener { agentPanel.show() }
-        }
-        btn.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 40f
-            setColor(0xE62B2622.toInt())
-            setStroke(1, 0x66FFFFFF)
+    /**
+     * 往站点顶部工具栏插入「设置」「考据」两个按钮。
+     *
+     * 按钮沿用站点自己的 `action-btn subtle` 样式，因此明暗主题、宣纸配色都一致。
+     * 用守卫避免重复注入（每次页面加载都会调一次）。
+     */
+    private fun injectToolbarButtons(view: WebView) {
+        view.evaluateJavascript(
+            """
+            (function () {
+              try {
+                if (document.getElementById('android-tools')) return 'exists';
+                var strip = document.querySelector('.control-strip');
+                if (!strip) return 'no-strip';
+
+                var wrap = document.createElement('span');
+                wrap.id = 'android-tools';
+                wrap.style.display = 'inline-flex';
+                wrap.style.alignItems = 'center';
+                wrap.style.gap = '4px';
+                wrap.style.marginRight = '4px';
+
+                function make(id, label, title, handler) {
+                  var b = document.createElement('button');
+                  b.id = id;
+                  b.type = 'button';
+                  b.className = 'action-btn subtle';
+                  b.title = title;
+                  b.textContent = label;
+                  b.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (window.$JS_BRIDGE_NAME) handler();
+                  });
+                  return b;
+                }
+
+                wrap.appendChild(make('android-settings', '设置', '设置：模型服务配置', function () {
+                  window.$JS_BRIDGE_NAME.openSettings();
+                }));
+                wrap.appendChild(make('android-agent', '考据', '考据助手', function () {
+                  window.$JS_BRIDGE_NAME.openAgent();
+                }));
+
+                strip.insertBefore(wrap, strip.firstChild);
+                return 'ok';
+              } catch (err) {
+                return 'err:' + err;
+              }
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    /** 暴露给网页的桥：只做两件事，且都在主线程回调 */
+    private inner class WebAppBridge {
+
+        @JavascriptInterface
+        fun openSettings() {
+            runOnUiThread { agentPanel.showSettings() }
         }
 
-        val lp = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
-            setMargins(24, 0, 24, 240)
+        @JavascriptInterface
+        fun openAgent() {
+            runOnUiThread { agentPanel.showAsk() }
         }
-        content.addView(btn, lp)
     }
 
     /** 支持 jiangshan://atlas?year=741&place=长安 这类深链 */
@@ -172,5 +219,6 @@ class MainActivity : AppCompatActivity() {
         private const val ASSET_DOMAIN = "appassets.androidplatform.net"
         private const val BASE_URL = "https://$ASSET_DOMAIN/assets/www"
         private const val PAPER_COLOR = 0xFFF3EEE4.toInt()
+        private const val JS_BRIDGE_NAME = "JiangshanAndroid"
     }
 }

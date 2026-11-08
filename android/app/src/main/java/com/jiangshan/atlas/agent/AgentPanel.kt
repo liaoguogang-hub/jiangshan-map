@@ -3,11 +3,13 @@ package com.jiangshan.atlas.agent
 import android.app.Activity
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -17,11 +19,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 考据助手浮层。
+ * 考据助手浮层，两种模式：
+ *   - [Mode.SETTINGS] 模型服务配置（厂商、地址、Key、模型名）
+ *   - [Mode.ASK]      提问与结果
  *
- * 之所以做成 MainActivity 里的浮层（而不是独立 Activity）：
- * Agent 需要调用 WebView 里的 `window.atlasAPI`，同进程同一份 WebView 最省事，
- * 也不用把 60MB 的站点资源再加载一遍。
+ * 做成 MainActivity 里的浮层（而不是独立 Activity）是因为 Agent 要调用
+ * WebView 里的 `window.atlasAPI`，同一份 WebView 最省事，也不用把 60MB
+ * 的站点资源再加载一遍。
  */
 class AgentPanel(
     private val activity: Activity,
@@ -30,16 +34,25 @@ class AgentPanel(
     private val onOpenMap: (String) -> Unit,
 ) {
 
+    enum class Mode { SETTINGS, ASK }
+
     val view: View = activity.layoutInflater.inflate(R.layout.panel_agent, parent, false)
 
     private val engine = AgentEngine(bridge)
     private val store = LlmConfigStore(activity)
+
+    private val card: LinearLayout = view.findViewById(R.id.agentCard)
+    private val panelTitle: TextView = view.findViewById(R.id.panelTitle)
+    private val panelSubtitle: TextView = view.findViewById(R.id.panelSubtitle)
+    private val settingsSection: LinearLayout = view.findViewById(R.id.settingsSection)
+    private val askSection: LinearLayout = view.findViewById(R.id.askSection)
 
     private val providerRow: LinearLayout = view.findViewById(R.id.providerRow)
     private val modelEdit: EditText = view.findViewById(R.id.modelEdit)
     private val baseUrlEdit: EditText = view.findViewById(R.id.baseUrlEdit)
     private val apiKeyEdit: EditText = view.findViewById(R.id.apiKeyEdit)
     private val configHint: TextView = view.findViewById(R.id.configHint)
+
     private val questionEdit: EditText = view.findViewById(R.id.questionEdit)
     private val askBtn: Button = view.findViewById(R.id.askBtn)
     private val progress: ProgressBar = view.findViewById(R.id.progress)
@@ -50,29 +63,21 @@ class AgentPanel(
 
     private var currentProvider = store.activeProvider
     private var deepLinkQuery: String? = null
+    private var mode = Mode.ASK
 
     init {
         view.visibility = View.GONE
-        // 需要高于 MainActivity 里浮动按钮的 elevation(12dp)，否则会被压在下面并截走触摸
+        // 需要高于 MainActivity 里浮动按钮的 elevation，否则会被压在下面并截走触摸
         view.elevation = 24f
         parent.addView(view, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
 
         view.findViewById<TextView>(R.id.closeBtn).setOnClickListener { hide() }
         // 点击卡片外的暗色区域关闭；卡片自身可点击以吞掉事件
         view.setOnClickListener { hide() }
-        view.findViewById<View>(R.id.agentCard).setOnClickListener { /* 吞掉点击 */ }
+        card.setOnClickListener { /* 吞掉点击 */ }
 
         buildProviderChips()
         loadProvider(currentProvider)
-
-        val examples = mapOf(
-            R.id.ex1 to "雪拥蓝关马不前是哪一年，韩愈当时被贬在哪里",
-            R.id.ex2 to "李白和杜甫在哪里相遇",
-            R.id.ex3 to "赤壁在今天的哪里",
-        )
-        examples.forEach { (id, text) ->
-            view.findViewById<Button>(id).setOnClickListener { questionEdit.setText(text) }
-        }
 
         view.findViewById<Button>(R.id.saveBtn).setOnClickListener {
             val cfg = readForm()
@@ -86,8 +91,16 @@ class AgentPanel(
             hideKeyboard()
         }
 
-        askBtn.setOnClickListener { ask() }
+        val examples = mapOf(
+            R.id.ex1 to "雪拥蓝关马不前是哪一年，韩愈当时被贬在哪里",
+            R.id.ex2 to "李白和杜甫在哪里相遇",
+            R.id.ex3 to "赤壁在今天的哪里",
+        )
+        examples.forEach { (id, text) ->
+            view.findViewById<Button>(id).setOnClickListener { questionEdit.setText(text) }
+        }
 
+        askBtn.setOnClickListener { ask() }
         openMapBtn.setOnClickListener {
             val q = deepLinkQuery
             if (q.isNullOrEmpty()) {
@@ -97,11 +110,27 @@ class AgentPanel(
             hide()
             onOpenMap(q)
         }
+
+        applyMode(Mode.ASK)
     }
 
-    fun show() {
+    fun show(mode: Mode) {
+        applyMode(mode)
         view.visibility = View.VISIBLE
         view.bringToFront()
+    }
+
+    fun showSettings() = show(Mode.SETTINGS)
+
+    /** 打开考据；若还没配 Key，自动引导到设置页 */
+    fun showAsk() {
+        val cfg = store.load(currentProvider)
+        if (!cfg.isUsable()) {
+            show(Mode.SETTINGS)
+            toast("先配置模型服务")
+            return
+        }
+        show(Mode.ASK)
     }
 
     fun hide() {
@@ -110,6 +139,38 @@ class AgentPanel(
     }
 
     fun isShowing() = view.visibility == View.VISIBLE
+
+    // ---------------------------------------------------------------- 模式
+
+    private fun applyMode(mode: Mode) {
+        this.mode = mode
+        val settings = mode == Mode.SETTINGS
+
+        val margin = dp(14)
+        card.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            if (settings) ViewGroup.LayoutParams.WRAP_CONTENT
+            else ViewGroup.LayoutParams.MATCH_PARENT
+        ).apply {
+            gravity = Gravity.TOP
+            setMargins(margin, margin, margin, margin)
+        }
+
+        settingsSection.visibility = if (settings) View.VISIBLE else View.GONE
+        askSection.visibility = if (settings) View.GONE else View.VISIBLE
+
+        panelTitle.text = if (settings) "设置" else "考据助手"
+        panelSubtitle.text = if (settings) {
+            "配置模型服务，Key 只存在本机"
+        } else {
+            "模型负责听懂问题，舆图负责查准史料"
+        }
+
+        if (settings) loadProvider(currentProvider)
+        openMapBtn.visibility =
+            if (settings) View.GONE
+            else if (deepLinkQuery.isNullOrEmpty()) View.GONE else View.VISIBLE
+    }
 
     // ---------------------------------------------------------------- 厂商切换
 
@@ -127,11 +188,13 @@ class AgentPanel(
                     refreshChips()
                 }
             }
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = 16 }
-            providerRow.addView(chip, lp)
+            providerRow.addView(
+                chip,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = dp(8) }
+            )
         }
         refreshChips()
     }
@@ -175,7 +238,7 @@ class AgentPanel(
         configHint.text = if (cfg.apiKey.isBlank()) {
             "还没填 API Key —— 在 ${LlmConfig.displayName(cfg.providerId)} 开放平台申请后粘贴到上面"
         } else {
-            "当前模型：${cfg.model} · ${cfg.endpoint()}"
+            "当前模型：${cfg.model}\n${cfg.endpoint()}"
         }
     }
 
@@ -189,7 +252,8 @@ class AgentPanel(
         }
         val cfg = readForm().let { if (it.apiKey.isBlank()) store.load(currentProvider) else it }
         if (!cfg.isUsable()) {
-            toast("请先选择厂商并填入 API Key")
+            toast("请先配置模型服务")
+            show(Mode.SETTINGS)
             return
         }
         store.save(cfg)
@@ -201,6 +265,7 @@ class AgentPanel(
         metaText.visibility = View.GONE
         openMapBtn.visibility = View.GONE
         deepLinkQuery = null
+        stageText.text = "正在请求模型 …"
 
         engine.ask(question, cfg, onStage = { stage ->
             stageText.text = stage
@@ -210,15 +275,11 @@ class AgentPanel(
             stageText.text = ""
             render(result)
         })
-
-        stageText.text = "正在请求模型 …"
     }
 
     private fun render(result: AgentResult) {
-        val sb = StringBuilder()
-
         if (result.error != null) {
-            sb.append("⚠ ").append(result.error)
+            val sb = StringBuilder("⚠ ").append(result.error)
             if (result.answer.isNotBlank()) sb.append("\n\n").append(result.answer)
             answerText.text = sb.toString()
             answerText.visibility = View.VISIBLE
@@ -289,6 +350,9 @@ class AgentPanel(
     }
 
     // ---------------------------------------------------------------- 工具
+
+    private fun dp(v: Int): Int =
+        (v * activity.resources.displayMetrics.density).toInt()
 
     private fun hideKeyboard() {
         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager

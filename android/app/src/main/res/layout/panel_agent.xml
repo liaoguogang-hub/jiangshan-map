@@ -9,7 +9,7 @@
     <LinearLayout
         android:id="@+id/agentCard"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:layout_margin="14dp"
         android:background="@drawable/card"
         android:clickable="true"
@@ -25,6 +25,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/panelTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -44,227 +45,248 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/panelSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="机型内置 Agent：模型负责听懂问题，舆图负责查准史料"
+            android:text="模型负责听懂问题，舆图负责查准史料"
             android:textColor="#6B6258"
             android:textSize="11sp" />
 
-        <!-- 模型配置 -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:id="@+id/providerRow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
-
+        <!-- ===================== 设置 ===================== -->
         <LinearLayout
+            android:id="@+id/settingsSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/providerRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
 
             <EditText
                 android:id="@+id/modelEdit"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/box"
                 android:hint="模型名，如 deepseek-chat"
                 android:inputType="text"
-                android:padding="9dp"
+                android:padding="10dp"
                 android:singleLine="true"
                 android:textColor="@color/ink"
                 android:textColorHint="#8A8278"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <EditText
-            android:id="@+id/baseUrlEdit"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/box"
-            android:hint="接口地址，如 https://api.deepseek.com"
-            android:inputType="textUri"
-            android:padding="9dp"
-            android:singleLine="true"
-            android:textColor="@color/ink"
-            android:textColorHint="#8A8278"
-            android:textSize="12sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="horizontal">
+                android:textSize="13sp" />
 
             <EditText
-                android:id="@+id/apiKeyEdit"
-                android:layout_width="0dp"
+                android:id="@+id/baseUrlEdit"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/box"
-                android:hint="API Key"
-                android:inputType="textPassword"
-                android:padding="9dp"
+                android:hint="接口地址，如 https://api.deepseek.com"
+                android:inputType="textUri"
+                android:padding="10dp"
                 android:singleLine="true"
                 android:textColor="@color/ink"
                 android:textColorHint="#8A8278"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/saveBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:minWidth="0dp"
-                android:paddingLeft="14dp"
-                android:paddingRight="14dp"
-                android:text="保存"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/configHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text=""
-            android:textColor="#8A8278"
-            android:textSize="10sp" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="12dp"
-            android:background="#D9CFC0" />
-
-        <!-- 提问与结果 -->
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="10dp">
+                android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
 
                 <EditText
-                    android:id="@+id/questionEdit"
-                    android:layout_width="match_parent"
+                    android:id="@+id/apiKeyEdit"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:background="@drawable/box"
-                    android:gravity="top"
-                    android:hint="例如：雪拥蓝关马不前是哪一年？李白和杜甫在哪里相遇？"
-                    android:minLines="2"
+                    android:hint="API Key"
+                    android:inputType="textPassword"
                     android:padding="10dp"
+                    android:singleLine="true"
                     android:textColor="@color/ink"
                     android:textColorHint="#8A8278"
-                    android:textSize="14sp"
-                    android:inputType="textMultiLine" />
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/saveBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:minWidth="0dp"
+                    android:paddingLeft="18dp"
+                    android:paddingRight="18dp"
+                    android:text="保存"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/configHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text=""
+                android:textColor="#8A8278"
+                android:textSize="11sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:lineSpacingMultiplier="1.4"
+                android:text="Key 只保存在本机 SharedPreferences，不会上传到任何服务器。"
+                android:textColor="#9A9082"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- ===================== 考据 ===================== -->
+        <LinearLayout
+            android:id="@+id/askSection"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:background="#D9CFC0" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="10dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
+
+                    <EditText
+                        android:id="@+id/questionEdit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/box"
+                        android:gravity="top"
+                        android:hint="例如：雪拥蓝关马不前是哪一年？李白和杜甫在哪里相遇？"
+                        android:inputType="textMultiLine"
+                        android:minLines="2"
+                        android:padding="10dp"
+                        android:textColor="@color/ink"
+                        android:textColorHint="#8A8278"
+                        android:textSize="14sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="7dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/ex1"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:minWidth="0dp"
+                            android:paddingLeft="0dp"
+                            android:paddingRight="0dp"
+                            android:text="雪拥蓝关"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/ex2"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:minWidth="0dp"
+                            android:paddingLeft="0dp"
+                            android:paddingRight="0dp"
+                            android:text="李白与杜甫"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/ex3"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:minWidth="0dp"
+                            android:paddingLeft="0dp"
+                            android:paddingRight="0dp"
+                            android:text="赤壁在哪"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <Button
-                        android:id="@+id/ex1"
-                        android:layout_width="0dp"
+                        android:id="@+id/askBtn"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:minWidth="0dp"
-                        android:paddingLeft="0dp"
-                        android:paddingRight="0dp"
-                        android:text="雪拥蓝关"
+                        android:layout_marginTop="7dp"
+                        android:text="考据" />
+
+                    <ProgressBar
+                        android:id="@+id/progress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/stageText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text=""
+                        android:textColor="#7A6F60"
                         android:textSize="11sp" />
 
-                    <Button
-                        android:id="@+id/ex2"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/answerText"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:minWidth="0dp"
-                        android:paddingLeft="0dp"
-                        android:paddingRight="0dp"
-                        android:text="李白与杜甫"
-                        android:textSize="11sp" />
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingMultiplier="1.45"
+                        android:textColor="@color/ink"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
 
-                    <Button
-                        android:id="@+id/ex3"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/metaText"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:minWidth="0dp"
-                        android:paddingLeft="0dp"
-                        android:paddingRight="0dp"
-                        android:text="赤壁在哪"
-                        android:textSize="11sp" />
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingMultiplier="1.4"
+                        android:textColor="#5C5346"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
                 </LinearLayout>
+            </ScrollView>
 
-                <Button
-                    android:id="@+id/askBtn"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:text="考据" />
-
-                <ProgressBar
-                    android:id="@+id/progress"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="8dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/stageText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text=""
-                    android:textColor="#7A6F60"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/answerText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingMultiplier="1.45"
-                    android:textColor="@color/ink"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/metaText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingMultiplier="1.4"
-                    android:textColor="#5C5346"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-        </ScrollView>
-
-        <Button
-            android:id="@+id/openMapBtn"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="在地图中打开"
-            android:visibility="gone" />
+            <Button
+                android:id="@+id/openMapBtn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="在地图中打开"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>
